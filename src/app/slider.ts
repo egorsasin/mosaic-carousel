@@ -87,6 +87,8 @@ export class MosSliderComponent implements OnInit {
     this.itemWidth.set(width / ITEMS_COUNT);
 
     const items = this.items();
+
+    const previousClones = items.slice(-ITEMS_COUNT)
     const slides: Slide[] = items
       .slice(-ITEMS_COUNT)
       .map((item: TemplateRef<unknown>) => new Slide(this.getId(), item));
