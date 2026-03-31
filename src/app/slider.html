@@ -17,7 +17,7 @@
   </button>
 
   <div class="flex gap-2">
-    @for (item of [1, 2, 3]; let index = $index; track index) {
+    @for (item of items(); let index = $index; track index) {
       <div
         class="h-0 border-4 rounded-full border-slate-500 transition-[width] duration-200"
         [class]="isActive(index) ? 'w-5' : 'w-2'"

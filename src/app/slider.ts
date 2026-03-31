@@ -45,6 +45,9 @@ export class SliderIdService {
   imports: [NgTemplateOutlet, NgClass],
   templateUrl: './slider.html',
   styleUrl: './slider.css',
+  host: {
+    '[class.mos-slider]': 'containerWidth() > 0',
+  },
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MosSliderComponent implements OnInit {
@@ -95,6 +98,7 @@ export class MosSliderComponent implements OnInit {
       auditTime(50),
       map((entries: ResizeObserverEntry[]) => {
         const entry = entries[0];
+
         return entry.contentRect.width;
       }),
     );
@@ -131,8 +135,10 @@ export class MosSliderComponent implements OnInit {
           .slice(items.length - itemsCount, items.length - currentItemsCount)
           .map((item: TemplateRef<unknown>) => new Slide(this.getId(), item));
 
+        console.log('___NEXT CLONES___', currentItemsCount, itemsCount);
+
         const nextClones = items
-          .slice(currentItemsCount, indexDiff)
+          .slice(currentItemsCount, itemsCount)
           .map((item: TemplateRef<unknown>) => new Slide(this.getId(), item));
         slides = [...previousClones, ...slides, ...nextClones];
 
@@ -163,7 +169,7 @@ export class MosSliderComponent implements OnInit {
     const itemsCount = this.itemsCount();
 
     if (this.index >= this.slides().length - itemsCount) {
-      this.index = itemsCount;
+      this.index = this.getTrueIndex(true);
 
       this.transformWrapper();
     } else if (this.index <= 0) {
@@ -176,19 +182,21 @@ export class MosSliderComponent implements OnInit {
     return this.getTrueIndex() === index;
   }
 
-  protected getTrueIndex(): number {
+  protected getTrueIndex(withOffset = false): number {
     const itemsLength = this.items().length;
     const offset: number = (this.slides().length - itemsLength) / 2;
 
+    let offsetIndex = this.index;
+
     if (this.index < offset) {
-      return itemsLength - offset + this.index;
+      offsetIndex = itemsLength + this.index;
     }
 
     if (this.index >= itemsLength + offset) {
-      return this.index - itemsLength - offset;
+      offsetIndex = this.index - itemsLength;
     }
 
-    return this.index - offset;
+    return offsetIndex - (withOffset ? 0 : offset);
   }
 
   private getId(): string {

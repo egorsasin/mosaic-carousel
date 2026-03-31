@@ -1,5 +1,7 @@
 :host {
-  @apply w-full overflow-hidden block;
+  @apply w-full overflow-hidden block opacity-0 transition-opacity duration-200;
 
-  
+  &.mos-slider {
+    @apply opacity-100;
+  }
 }
