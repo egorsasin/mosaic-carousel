@@ -1,5 +1,3 @@
-<h2>{{ slides().length }} slides</h2>
-
 <div
   #wrapper
   class="min-h-40 h-40 bg-gray-200 flex"
@@ -7,7 +5,7 @@
   (transitionend)="onTransitionEnd($event)"
 >
   @for (item of slides(); let index = $index; track item.id) {
-    <div class="h-full shrink-0" [style.width.px]="itemWidth">
+    <div class="h-full shrink-0" [style.width.px]="itemWidth()">
       <ng-container *ngTemplateOutlet="item.template"></ng-container>
     </div>
   }

@@ -11,14 +11,14 @@ import {
   viewChild,
   WritableSignal,
   ChangeDetectionStrategy,
-  ChangeDetectorRef,
   DestroyRef,
+  computed,
 } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
+import { auditTime, distinctUntilChanged, filter, map, Observable } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { MosSlideDirective } from './slide.directive';
-import { auditTime, filter, Observable, throttleTime } from 'rxjs';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 const ITEMS_COUNT = 3;
 
@@ -48,10 +48,9 @@ export class SliderIdService {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MosSliderComponent implements OnInit {
+  private destroyRef = inject(DestroyRef);
   private elementRef = inject(ElementRef);
   private idService: SliderIdService = inject(SliderIdService);
-  private cdr: ChangeDetectorRef = inject(ChangeDetectorRef);
-
   private index = 0;
 
   private get wrapperElement(): HTMLElement {
@@ -62,14 +61,21 @@ export class MosSliderComponent implements OnInit {
   protected items: Signal<readonly TemplateRef<unknown>[]> = contentChildren(MosSlideDirective, {
     read: TemplateRef,
   });
-  protected itemWidth = 0;
-  protected slides: WritableSignal<Slide[]> = signal<Slide[]>([]);
-  protected itemsCount = signal<number>(ITEMS_COUNT);
+  protected itemWidth: Signal<number> = computed(() => {
+    const itemsCount = this.itemsCount();
 
+    return itemsCount ? this.containerWidth() / itemsCount : this.containerWidth();
+  });
+  protected slides: WritableSignal<Slide[]> = signal<Slide[]>([]);
+  protected itemsCount = signal<number>(0);
+  protected containerWidth = signal<number>(0);
   protected animated = false;
 
-  constructor() {
-    const destroyRef = inject(DestroyRef);
+  public ngOnInit(): void {
+    this.slides.set(
+      this.items().map((item: TemplateRef<unknown>) => new Slide(this.getId(), item)),
+    );
+
     const resize = new Observable<ResizeObserverEntry[]>((subscriber) => {
       const nativeElement = this.elementRef.nativeElement;
       const observer = new ResizeObserver((entries: ResizeObserverEntry[]) => {
@@ -84,36 +90,57 @@ export class MosSliderComponent implements OnInit {
       };
     });
 
-    resize
-      .pipe(
-        filter((entries: ResizeObserverEntry[]) => !!entries.length),
-        auditTime(50),
-        takeUntilDestroyed(destroyRef),
-      )
-      .subscribe((entries) => {
+    const containerWidth = resize.pipe(
+      filter((entries: ResizeObserverEntry[]) => !!entries.length),
+      auditTime(50),
+      map((entries: ResizeObserverEntry[]) => {
         const entry = entries[0];
-        const width = entry.contentRect.width;
+        return entry.contentRect.width;
+      }),
+    );
 
-        this.itemWidth = width / this.itemsCount();
+    containerWidth.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((width: number) => {
+      this.containerWidth.set(width);
 
-        this.transformWrapper();
-        this.cdr.markForCheck();
+      this.transformWrapper();
+    });
+
+    containerWidth
+      .pipe(
+        map((width: number) => (width <= 400 ? 1 : 3)),
+        distinctUntilChanged(),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((itemsCount: number) => {
+        this.renderSlides(itemsCount);
       });
   }
 
-  public ngOnInit(): void {
-    this.index = this.itemsCount();
-
+  private renderSlides(itemsCount: number): void {
+    const currentItemsCount = this.itemsCount();
+    const indexDiff = itemsCount - currentItemsCount;
     const items = this.items();
 
-    const previousClones = items.slice(-this.index);
-    const nextClones = items.slice(0, this.index);
-    const slides: Slide[] = [...previousClones, ...items, ...nextClones].map(
-      (item: TemplateRef<unknown>) => new Slide(this.getId(), item),
-    );
+    let slides: Slide[] = this.slides();
 
-    this.slides.set(slides);
+    if (indexDiff > 0) {
+      if (slides.length < items.length + itemsCount * 2) {
+        this.index = this.getTrueIndex() + itemsCount;
 
+        const previousClones = items
+          .slice(items.length - itemsCount, items.length - currentItemsCount)
+          .map((item: TemplateRef<unknown>) => new Slide(this.getId(), item));
+
+        const nextClones = items
+          .slice(currentItemsCount, indexDiff)
+          .map((item: TemplateRef<unknown>) => new Slide(this.getId(), item));
+        slides = [...previousClones, ...slides, ...nextClones];
+
+        this.slides.set(slides);
+      }
+    }
+
+    this.itemsCount.set(itemsCount);
     this.transformWrapper();
   }
 
@@ -140,25 +167,28 @@ export class MosSliderComponent implements OnInit {
 
       this.transformWrapper();
     } else if (this.index <= 0) {
-      this.index = itemsCount;
-
+      this.index = this.items().length;
       this.transformWrapper();
     }
   }
 
   protected isActive(index: number): boolean {
+    return this.getTrueIndex() === index;
+  }
+
+  protected getTrueIndex(): number {
     const itemsLength = this.items().length;
-    const itemsCount = this.itemsCount();
+    const offset: number = (this.slides().length - itemsLength) / 2;
 
-    if (this.index < itemsCount) {
-      return itemsLength - itemsCount + this.index === index;
+    if (this.index < offset) {
+      return itemsLength - offset + this.index;
     }
 
-    if (this.index >= itemsCount + itemsLength) {
-      return itemsLength + itemsCount - this.index === index;
+    if (this.index >= itemsLength + offset) {
+      return this.index - itemsLength - offset;
     }
 
-    return this.index - itemsCount === index;
+    return this.index - offset;
   }
 
   private getId(): string {
@@ -166,7 +196,7 @@ export class MosSliderComponent implements OnInit {
   }
 
   private transformWrapper(): void {
-    const transform = this.itemWidth * this.index;
+    const transform = this.itemWidth() * this.index;
 
     this.wrapperElement.style.transform = `translateX(-${transform}px)`;
   }
