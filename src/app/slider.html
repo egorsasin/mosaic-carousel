@@ -1,0 +1,16 @@
+<h2>{{slides().length}} slides</h2>
+
+<div #wrapper class="min-h-40 h-40 bg-gray-200 flex" 
+    [ngClass]="{'transition-transform duration-300 ease-in-out': animated}"
+      (transitionend)="onTransitionEnd($event)">
+    @for (item of slides(); let index = $index; track item.id) {
+        <div class="h-full shrink-0" [style.width.px]="itemWidth()">
+            <ng-container *ngTemplateOutlet="item.template"></ng-container>
+        </div>
+    }
+</div>
+
+<div class="w-full flex justify-between mt-4">
+    <button class="px-4 py-2 bg-gray-300 rounded" (click)="onControlsClick(-1)">Prev</button>
+    <button class="px-4 py-2 bg-gray-300 rounded" (click)="onControlsClick(1)">Next</button>
+</div>

@@ -1,12 +1,14 @@
-import { Component, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component } from '@angular/core';
+
+import { MosSliderComponent } from './slider';
+import { MosSlideDirective } from './slide.directive';
+
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet],
+  imports: [MosSliderComponent, MosSlideDirective],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
 export class App {
-  protected readonly title = signal('mosaic-carousel');
 }
