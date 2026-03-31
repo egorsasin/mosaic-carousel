@@ -135,8 +135,6 @@ export class MosSliderComponent implements OnInit {
           .slice(items.length - itemsCount, items.length - currentItemsCount)
           .map((item: TemplateRef<unknown>) => new Slide(this.getId(), item));
 
-        console.log('___NEXT CLONES___', currentItemsCount, itemsCount);
-
         const nextClones = items
           .slice(currentItemsCount, itemsCount)
           .map((item: TemplateRef<unknown>) => new Slide(this.getId(), item));
