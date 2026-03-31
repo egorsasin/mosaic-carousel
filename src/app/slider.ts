@@ -20,8 +20,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { MosSlideDirective } from './slide.directive';
 
-const ITEMS_COUNT = 3;
-
 export class Slide {
   constructor(
     public readonly id: string,
