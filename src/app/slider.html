@@ -11,21 +11,21 @@
   }
 </div>
 
-<div class="w-full flex justify-between mt-4">
-  <button class="cursor-pointer p-2" (click)="onControlsClick(-1)">
-    <div class="size-2 border-t-2 border-l-2 -rotate-45"></div>
+<div class="w-full flex justify-between mt-4 items-center">
+  <button class="cursor-pointer px-4 py-2" (click)="onControlsClick(-1)">
+    <div class="size-2 border-t-2 border-l-2 border-slate-700 -rotate-45"></div>
   </button>
 
-  <div class="flex gap-2">
+  <div class="flex gap-1.5">
     @for (item of items(); let index = $index; track index) {
       <div
-        class="h-0 border-4 rounded-full border-slate-500 transition-[width] duration-200"
+        class="h-0 border-4 rounded-full border-slate-700 transition-[width] duration-200"
         [class]="isActive(index) ? 'w-5' : 'w-2'"
       ></div>
     }
   </div>
 
   <button class="cursor-pointer p-2" (click)="onControlsClick(1)">
-    <div class="size-2 border-b-2 border-r-2 -rotate-45"></div>
+    <div class="size-2 border-b-2 border-r-2 border-slate-700 -rotate-45"></div>
   </button>
 </div>
