@@ -13,9 +13,21 @@ import {
   ChangeDetectionStrategy,
   DestroyRef,
   computed,
+  ChangeDetectorRef,
 } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
-import { auditTime, distinctUntilChanged, filter, map, Observable } from 'rxjs';
+import {
+  auditTime,
+  distinctUntilChanged,
+  filter,
+  fromEvent,
+  map,
+  Observable,
+  race,
+  switchMap,
+  take,
+  takeUntil,
+} from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { MosSlideDirective } from './slide.directive';
@@ -52,9 +64,9 @@ export class MosSliderComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
   private elementRef = inject(ElementRef);
   private idService: SliderIdService = inject(SliderIdService);
-  private index = 0;
+  private cdr = inject(ChangeDetectorRef);
 
-  private get wrapperElement(): HTMLElement {
+  public get wrapperElement(): HTMLElement {
     return this.wrapper().nativeElement;
   }
 
@@ -62,7 +74,7 @@ export class MosSliderComponent implements OnInit {
   protected items: Signal<readonly TemplateRef<unknown>[]> = contentChildren(MosSlideDirective, {
     read: TemplateRef,
   });
-  protected itemWidth: Signal<number> = computed(() => {
+  public readonly itemWidth: Signal<number> = computed(() => {
     const itemsCount = this.itemsCount();
 
     return itemsCount ? this.containerWidth() / itemsCount : this.containerWidth();
@@ -71,6 +83,8 @@ export class MosSliderComponent implements OnInit {
   protected itemsCount = signal<number>(0);
   protected containerWidth = signal<number>(0);
   protected animated = false;
+
+  public index = 0;
 
   public ngOnInit(): void {
     this.slides.set(
@@ -116,6 +130,8 @@ export class MosSliderComponent implements OnInit {
       .subscribe((itemsCount: number) => {
         this.renderSlides(itemsCount);
       });
+
+    this.handleGestures();
   }
 
   private renderSlides(itemsCount: number): void {
@@ -178,7 +194,7 @@ export class MosSliderComponent implements OnInit {
     return this.getTrueIndex() === index;
   }
 
-  protected getTrueIndex(withOffset = false): number {
+  private getTrueIndex(withOffset = false): number {
     const itemsLength = this.items().length;
     const offset: number = (this.slides().length - itemsLength) / 2;
 
@@ -201,7 +217,55 @@ export class MosSliderComponent implements OnInit {
 
   private transformWrapper(): void {
     const transform = this.itemWidth() * this.index;
-
     this.wrapperElement.style.transform = `translateX(-${transform}px)`;
+  }
+
+  private handleGestures(): void {
+    const wrapper = this.wrapperElement;
+
+    const pointerDown$ = fromEvent<PointerEvent>(wrapper, 'pointerdown');
+    const pointerUp$ = fromEvent<PointerEvent>(wrapper, 'pointerup');
+    const pointerMove$ = fromEvent<PointerEvent>(wrapper, 'pointermove');
+    const pointerLeave$ = fromEvent<PointerEvent>(wrapper, 'pointerleave');
+
+    const combined$ = race([pointerUp$, pointerLeave$]);
+
+    pointerDown$
+      .pipe(
+        map(({ clientX }: PointerEvent): number => clientX),
+        switchMap((startX: number) =>
+          pointerMove$.pipe(
+            map(({ clientX }: PointerEvent) => clientX - startX),
+            takeUntil(combined$),
+          ),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((transition: number) => {
+        const initialTransition = this.index * this.itemWidth();
+
+        requestAnimationFrame(() => {
+          wrapper.style.transform = `translateX(${-initialTransition + transition}px)`;
+        });
+      });
+
+    pointerDown$
+      .pipe(
+        map(({ clientX }: PointerEvent): number => clientX),
+        switchMap((startX: number) =>
+          combined$.pipe(
+            map(({ clientX }: PointerEvent) => startX - clientX),
+            take(1),
+          ),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((distance) => {
+        const indexMoved = -distance / this.itemWidth();
+        const indexDiff = distance > 0 ? Math.floor(indexMoved) : Math.ceil(indexMoved);
+
+        this.onControlsClick(-indexDiff);
+        this.cdr.markForCheck();
+      });
   }
 }
